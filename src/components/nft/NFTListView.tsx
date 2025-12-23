@@ -3,14 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, 
   Search, 
-  Filter, 
   MoreHorizontal, 
   Edit, 
   Trash2, 
   Eye,
   ArrowUpDown
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { mockNFTs, mockCollections, type NFT, type MintStatus } from '@/data/mockData';
+import { NFTDetailDrawer } from './NFTDetailDrawer';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -205,6 +205,13 @@ export function NFTListView() {
           <p className="text-muted-foreground">No NFTs found matching your filters</p>
         </div>
       )}
+
+      {/* NFT Detail Drawer */}
+      <NFTDetailDrawer 
+        nft={selectedNFT} 
+        open={!!selectedNFT} 
+        onOpenChange={(open) => !open && setSelectedNFT(null)} 
+      />
     </motion.div>
   );
 }
