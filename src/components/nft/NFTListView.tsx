@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/select';
 import { mockNFTs, mockCollections, type NFT, type MintStatus } from '@/data/mockData';
 import { NFTDetailDrawer } from './NFTDetailDrawer';
+import { NFTForm } from './NFTForm';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -42,7 +43,15 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 }
 };
 
-function NFTCard({ nft, onSelect }: { nft: NFT; onSelect: (nft: NFT) => void }) {
+function NFTCard({ 
+  nft, 
+  onSelect, 
+  onEdit 
+}: { 
+  nft: NFT; 
+  onSelect: (nft: NFT) => void;
+  onEdit: (nft: NFT) => void;
+}) {
   const statusVariant = {
     draft: 'draft',
     ready: 'ready',
@@ -73,7 +82,15 @@ function NFTCard({ nft, onSelect }: { nft: NFT; onSelect: (nft: NFT) => void }) 
               <Button size="sm" variant="secondary" className="flex-1">
                 <Eye className="w-4 h-4 mr-1" /> View
               </Button>
-              <Button size="sm" variant="outline" className="flex-1">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="flex-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(nft);
+                }}
+              >
                 <Edit className="w-4 h-4 mr-1" /> Edit
               </Button>
             </div>
@@ -92,9 +109,15 @@ function NFTCard({ nft, onSelect }: { nft: NFT; onSelect: (nft: NFT) => void }) 
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem><Eye className="w-4 h-4 mr-2" /> View Details</DropdownMenuItem>
-                <DropdownMenuItem><Edit className="w-4 h-4 mr-2" /> Edit</DropdownMenuItem>
-                <DropdownMenuItem className="text-destructive"><Trash2 className="w-4 h-4 mr-2" /> Delete</DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelect(nft); }}>
+                  <Eye className="w-4 h-4 mr-2" /> View Details
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(nft); }}>
+                  <Edit className="w-4 h-4 mr-2" /> Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-destructive">
+                  <Trash2 className="w-4 h-4 mr-2" /> Delete
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -117,6 +140,8 @@ export function NFTListView() {
   const [statusFilter, setStatusFilter] = useState<MintStatus | 'all'>('all');
   const [collectionFilter, setCollectionFilter] = useState<string>('all');
   const [selectedNFT, setSelectedNFT] = useState<NFT | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingNFT, setEditingNFT] = useState<NFT | null>(null);
 
   const filteredNFTs = mockNFTs.filter(nft => {
     const matchesSearch = nft.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -125,6 +150,16 @@ export function NFTListView() {
     const matchesCollection = collectionFilter === 'all' || nft.collection === collectionFilter;
     return matchesSearch && matchesStatus && matchesCollection;
   });
+
+  const handleCreateNew = () => {
+    setEditingNFT(null);
+    setFormOpen(true);
+  };
+
+  const handleEdit = (nft: NFT) => {
+    setEditingNFT(nft);
+    setFormOpen(true);
+  };
 
   return (
     <motion.div
@@ -139,7 +174,7 @@ export function NFTListView() {
           <h1 className="text-3xl font-display font-bold text-glow">NFT Items</h1>
           <p className="text-muted-foreground mt-1">Manage your NFT collection</p>
         </div>
-        <Button className="gap-2">
+        <Button className="gap-2" onClick={handleCreateNew}>
           <Plus className="w-4 h-4" />
           Create NFT
         </Button>
@@ -195,7 +230,7 @@ export function NFTListView() {
       >
         <AnimatePresence mode="popLayout">
           {filteredNFTs.map((nft) => (
-            <NFTCard key={nft.id} nft={nft} onSelect={setSelectedNFT} />
+            <NFTCard key={nft.id} nft={nft} onSelect={setSelectedNFT} onEdit={handleEdit} />
           ))}
         </AnimatePresence>
       </motion.div>
@@ -211,6 +246,13 @@ export function NFTListView() {
         nft={selectedNFT} 
         open={!!selectedNFT} 
         onOpenChange={(open) => !open && setSelectedNFT(null)} 
+      />
+
+      {/* NFT Create/Edit Form */}
+      <NFTForm
+        nft={editingNFT}
+        open={formOpen}
+        onOpenChange={setFormOpen}
       />
     </motion.div>
   );
