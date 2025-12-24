@@ -315,6 +315,78 @@ function ImageUploader({
   );
 }
 
+function EditionImageUploader({
+  imageUrl,
+  onImageChange,
+}: {
+  imageUrl?: string;
+  onImageChange: (url: string) => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    onImageChange(url);
+  };
+
+  return (
+    <div className="space-y-2">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleFileSelect(file);
+        }}
+      />
+      {imageUrl ? (
+        <div className="relative group">
+          <img
+            src={imageUrl}
+            alt="Edition artwork"
+            className="w-full h-24 object-cover rounded-lg border border-border/50"
+          />
+          <div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-1">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="w-3 h-3 mr-1" />
+              Replace
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => onImageChange('')}
+            >
+              <Trash2 className="w-3 h-3" />
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div
+          onClick={() => fileInputRef.current?.click()}
+          className="h-24 rounded-lg border-2 border-dashed border-border/50 hover:border-primary/50 cursor-pointer flex flex-col items-center justify-center gap-1 transition-colors bg-card/30"
+        >
+          <ImageIcon className="w-5 h-5 text-muted-foreground" />
+          <span className="text-[10px] text-muted-foreground">Edition Artwork</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EditionManager({
   editions,
   onEditionsChange,
@@ -372,6 +444,12 @@ function EditionManager({
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
+
+                {/* Edition Image */}
+                <EditionImageUploader
+                  imageUrl={edition.imageUrl}
+                  onImageChange={(url) => updateEdition(edition.id, 'imageUrl', url)}
+                />
 
                 <div className="grid grid-cols-2 gap-3">
                   {/* Edition Name */}
