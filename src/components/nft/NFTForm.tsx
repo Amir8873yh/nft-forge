@@ -14,6 +14,10 @@ import {
   AlignLeft,
   Tag,
   Check,
+  Crown,
+  Eye,
+  EyeOff,
+  Coins,
 } from 'lucide-react';
 import {
   Sheet,
@@ -48,8 +52,10 @@ import {
 import {
   type NFT,
   type Trait,
+  type Edition,
   type TokenStandard,
   type SupplyType,
+  type RevealStatus,
   mockCollections,
   mockTraits,
   traitCategories,
@@ -71,7 +77,18 @@ export interface NFTFormData {
   tokenStandard: TokenStandard;
   supplyType: SupplyType;
   traits: Trait[];
+  editions: Edition[];
 }
+
+const createDefaultEdition = (): Edition => ({
+  id: `ed-${Date.now()}`,
+  name: '',
+  maxSupply: 100,
+  mintPrice: 0.1,
+  currency: 'ETH',
+  revealStatus: 'hidden',
+  minted: 0,
+});
 
 const defaultFormData: NFTFormData = {
   name: '',
@@ -81,6 +98,7 @@ const defaultFormData: NFTFormData = {
   tokenStandard: 'ERC-721',
   supplyType: '1/1',
   traits: [],
+  editions: [],
 };
 
 function TraitSelector({ 
@@ -297,6 +315,161 @@ function ImageUploader({
   );
 }
 
+function EditionManager({
+  editions,
+  onEditionsChange,
+}: {
+  editions: Edition[];
+  onEditionsChange: (editions: Edition[]) => void;
+}) {
+  const addEdition = () => {
+    onEditionsChange([...editions, createDefaultEdition()]);
+  };
+
+  const updateEdition = (id: string, field: keyof Edition, value: any) => {
+    onEditionsChange(
+      editions.map((ed) => (ed.id === id ? { ...ed, [field]: value } : ed))
+    );
+  };
+
+  const removeEdition = (id: string) => {
+    onEditionsChange(editions.filter((ed) => ed.id !== id));
+  };
+
+  return (
+    <div className="space-y-4">
+      {editions.length === 0 ? (
+        <div className="text-center py-8 border border-dashed border-border/50 rounded-lg">
+          <Crown className="w-8 h-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+          <p className="text-sm text-muted-foreground mb-3">No editions added yet</p>
+          <Button variant="outline" size="sm" onClick={addEdition}>
+            <Plus className="w-4 h-4 mr-1" />
+            Add First Edition
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <AnimatePresence mode="popLayout">
+            {editions.map((edition, index) => (
+              <motion.div
+                key={edition.id}
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="p-4 rounded-lg border border-border/50 bg-card/30 space-y-4"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Crown className="w-4 h-4 text-warning" />
+                    <span className="text-sm font-medium">Edition {index + 1}</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                    onClick={() => removeEdition(edition.id)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Edition Name */}
+                  <div className="col-span-2 space-y-2">
+                    <Label className="text-xs">Edition Name</Label>
+                    <Input
+                      placeholder="e.g., Genesis, Legendary"
+                      value={edition.name}
+                      onChange={(e) => updateEdition(edition.id, 'name', e.target.value)}
+                    />
+                  </div>
+
+                  {/* Max Supply */}
+                  <div className="space-y-2">
+                    <Label className="text-xs">Max Supply</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      placeholder="100"
+                      value={edition.maxSupply}
+                      onChange={(e) => updateEdition(edition.id, 'maxSupply', parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+
+                  {/* Mint Price */}
+                  <div className="space-y-2">
+                    <Label className="text-xs">Mint Price</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        step={0.001}
+                        placeholder="0.1"
+                        value={edition.mintPrice}
+                        onChange={(e) => updateEdition(edition.id, 'mintPrice', parseFloat(e.target.value) || 0)}
+                        className="flex-1"
+                      />
+                      <Select
+                        value={edition.currency}
+                        onValueChange={(v) => updateEdition(edition.id, 'currency', v)}
+                      >
+                        <SelectTrigger className="w-24">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ETH">ETH</SelectItem>
+                          <SelectItem value="MATIC">MATIC</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Reveal Status */}
+                  <div className="col-span-2 space-y-2">
+                    <Label className="text-xs">Reveal Status</Label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant={edition.revealStatus === 'hidden' ? 'default' : 'outline'}
+                        size="sm"
+                        className="flex-1 gap-2"
+                        onClick={() => updateEdition(edition.id, 'revealStatus', 'hidden')}
+                      >
+                        <EyeOff className="w-4 h-4" />
+                        Hidden
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={edition.revealStatus === 'revealed' ? 'default' : 'outline'}
+                        size="sm"
+                        className="flex-1 gap-2"
+                        onClick={() => updateEdition(edition.id, 'revealStatus', 'revealed')}
+                      >
+                        <Eye className="w-4 h-4" />
+                        Revealed
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={addEdition}
+            className="w-full border-dashed"
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            Add Another Edition
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function NFTForm({ nft, open, onOpenChange, onSave }: NFTFormProps) {
   const isEditing = !!nft;
   const [formData, setFormData] = useState<NFTFormData>(
@@ -309,6 +482,7 @@ export function NFTForm({ nft, open, onOpenChange, onSave }: NFTFormProps) {
           tokenStandard: nft.tokenStandard,
           supplyType: nft.supplyType,
           traits: nft.traits,
+          editions: nft.editions,
         }
       : defaultFormData
   );
@@ -549,6 +723,30 @@ export function NFTForm({ nft, open, onOpenChange, onSave }: NFTFormProps) {
                   <TraitSelector
                     selectedTraits={formData.traits}
                     onTraitsChange={(traits) => updateField('traits', traits)}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+
+            <Separator className="bg-border/50" />
+
+            {/* Edition Management */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center gap-2 text-base">
+                  <Crown className="w-4 h-4" />
+                  Editions
+                </Label>
+                <Badge variant="outline">
+                  {formData.editions.length} edition{formData.editions.length !== 1 ? 's' : ''}
+                </Badge>
+              </div>
+
+              <Card>
+                <CardContent className="p-4">
+                  <EditionManager
+                    editions={formData.editions}
+                    onEditionsChange={(editions) => updateField('editions', editions)}
                   />
                 </CardContent>
               </Card>
