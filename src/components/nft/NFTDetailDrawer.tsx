@@ -98,45 +98,65 @@ function EditionCard({ edition, onMint }: { edition: Edition; onMint: (edition: 
       animate={{ opacity: 1, y: 0 }}
       className="p-4 rounded-xl border border-border/50 bg-gradient-to-br from-card to-card/50"
     >
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <h4 className="font-display font-semibold">{edition.name}</h4>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {edition.minted} / {edition.maxSupply} minted
-          </p>
-        </div>
-        <Badge 
-          variant={edition.revealStatus === 'revealed' ? 'minted' : 'draft'}
-          className="capitalize"
-        >
-          {edition.revealStatus}
-        </Badge>
-      </div>
-      
-      <Progress value={progress} className="h-2 mb-3" />
-      
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <Wallet className="w-4 h-4 text-primary" />
-          <span className="font-display font-bold text-lg">
-            {edition.mintPrice} {edition.currency}
-          </span>
-        </div>
-        <Button 
-          size="sm" 
-          disabled={isSoldOut}
-          onClick={() => onMint(edition)}
-          className="gap-1.5"
-        >
-          {isSoldOut ? (
-            <>Sold Out</>
+      <div className="flex gap-4">
+        {/* Edition Image */}
+        <div className="flex-shrink-0">
+          {edition.imageUrl ? (
+            <img
+              src={edition.imageUrl}
+              alt={`${edition.name} artwork`}
+              className="w-20 h-20 rounded-lg object-cover border border-border/50"
+            />
           ) : (
-            <>
-              <Zap className="w-3.5 h-3.5" />
-              Mint
-            </>
+            <div className="w-20 h-20 rounded-lg bg-card/80 border border-border/50 flex items-center justify-center">
+              <ImageIcon className="w-6 h-6 text-muted-foreground/50" />
+            </div>
           )}
-        </Button>
+        </div>
+
+        {/* Edition Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between mb-2">
+            <div>
+              <h4 className="font-display font-semibold">{edition.name || 'Unnamed Edition'}</h4>
+              <p className="text-sm text-muted-foreground">
+                {edition.minted} / {edition.maxSupply} minted
+              </p>
+            </div>
+            <Badge 
+              variant={edition.revealStatus === 'revealed' ? 'minted' : 'draft'}
+              className="capitalize flex-shrink-0"
+            >
+              {edition.revealStatus}
+            </Badge>
+          </div>
+          
+          <Progress value={progress} className="h-2 mb-3" />
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Wallet className="w-4 h-4 text-primary" />
+              <span className="font-display font-bold">
+                {edition.mintPrice} {edition.currency}
+              </span>
+            </div>
+            <Button 
+              size="sm" 
+              disabled={isSoldOut}
+              onClick={() => onMint(edition)}
+              className="gap-1.5"
+            >
+              {isSoldOut ? (
+                <>Sold Out</>
+              ) : (
+                <>
+                  <Zap className="w-3.5 h-3.5" />
+                  Mint
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
       </div>
     </motion.div>
   );
