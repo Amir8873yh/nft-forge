@@ -1,6 +1,23 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import {
   X,
   Upload,
   Image as ImageIcon,
@@ -18,6 +35,7 @@ import {
   Eye,
   EyeOff,
   Coins,
+  GripVertical,
 } from 'lucide-react';
 import {
   Sheet,
@@ -387,6 +405,153 @@ function EditionImageUploader({
   );
 }
 
+function SortableEditionCard({
+  edition,
+  index,
+  onUpdate,
+  onRemove,
+}: {
+  edition: Edition;
+  index: number;
+  onUpdate: (field: keyof Edition, value: any) => void;
+  onRemove: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: edition.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <motion.div
+      ref={setNodeRef}
+      style={style}
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      className={`p-4 rounded-lg border border-border/50 bg-card/30 space-y-4 ${
+        isDragging ? 'z-50 shadow-lg ring-2 ring-primary/50' : ''
+      }`}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="cursor-grab active:cursor-grabbing touch-none p-1 -ml-1 text-muted-foreground hover:text-foreground transition-colors"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="w-4 h-4" />
+          </button>
+          <Crown className="w-4 h-4 text-warning" />
+          <span className="text-sm font-medium">Edition {index + 1}</span>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+          onClick={onRemove}
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      </div>
+
+      {/* Edition Image */}
+      <EditionImageUploader
+        imageUrl={edition.imageUrl}
+        onImageChange={(url) => onUpdate('imageUrl', url)}
+      />
+
+      <div className="grid grid-cols-2 gap-3">
+        {/* Edition Name */}
+        <div className="col-span-2 space-y-2">
+          <Label className="text-xs">Edition Name</Label>
+          <Input
+            placeholder="e.g., Genesis, Legendary"
+            value={edition.name}
+            onChange={(e) => onUpdate('name', e.target.value)}
+          />
+        </div>
+
+        {/* Max Supply */}
+        <div className="space-y-2">
+          <Label className="text-xs">Max Supply</Label>
+          <Input
+            type="number"
+            min={1}
+            placeholder="100"
+            value={edition.maxSupply}
+            onChange={(e) => onUpdate('maxSupply', parseInt(e.target.value) || 0)}
+          />
+        </div>
+
+        {/* Mint Price */}
+        <div className="space-y-2">
+          <Label className="text-xs">Mint Price</Label>
+          <div className="flex gap-2">
+            <Input
+              type="number"
+              min={0}
+              step={0.001}
+              placeholder="0.1"
+              value={edition.mintPrice}
+              onChange={(e) => onUpdate('mintPrice', parseFloat(e.target.value) || 0)}
+              className="flex-1"
+            />
+            <Select
+              value={edition.currency}
+              onValueChange={(v) => onUpdate('currency', v)}
+            >
+              <SelectTrigger className="w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ETH">ETH</SelectItem>
+                <SelectItem value="MATIC">MATIC</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Reveal Status */}
+        <div className="col-span-2 space-y-2">
+          <Label className="text-xs">Reveal Status</Label>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant={edition.revealStatus === 'hidden' ? 'default' : 'outline'}
+              size="sm"
+              className="flex-1 gap-2"
+              onClick={() => onUpdate('revealStatus', 'hidden')}
+            >
+              <EyeOff className="w-4 h-4" />
+              Hidden
+            </Button>
+            <Button
+              type="button"
+              variant={edition.revealStatus === 'revealed' ? 'default' : 'outline'}
+              size="sm"
+              className="flex-1 gap-2"
+              onClick={() => onUpdate('revealStatus', 'revealed')}
+            >
+              <Eye className="w-4 h-4" />
+              Revealed
+            </Button>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 function EditionManager({
   editions,
   onEditionsChange,
@@ -394,6 +559,13 @@ function EditionManager({
   editions: Edition[];
   onEditionsChange: (editions: Edition[]) => void;
 }) {
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   const addEdition = () => {
     onEditionsChange([...editions, createDefaultEdition()]);
   };
@@ -406,6 +578,16 @@ function EditionManager({
 
   const removeEdition = (id: string) => {
     onEditionsChange(editions.filter((ed) => ed.id !== id));
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = editions.findIndex((ed) => ed.id === active.id);
+      const newIndex = editions.findIndex((ed) => ed.id === over.id);
+      onEditionsChange(arrayMove(editions, oldIndex, newIndex));
+    }
   };
 
   return (
@@ -421,117 +603,28 @@ function EditionManager({
         </div>
       ) : (
         <div className="space-y-3">
-          <AnimatePresence mode="popLayout">
-            {editions.map((edition, index) => (
-              <motion.div
-                key={edition.id}
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="p-4 rounded-lg border border-border/50 bg-card/30 space-y-4"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Crown className="w-4 h-4 text-warning" />
-                    <span className="text-sm font-medium">Edition {index + 1}</span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                    onClick={() => removeEdition(edition.id)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-
-                {/* Edition Image */}
-                <EditionImageUploader
-                  imageUrl={edition.imageUrl}
-                  onImageChange={(url) => updateEdition(edition.id, 'imageUrl', url)}
-                />
-
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Edition Name */}
-                  <div className="col-span-2 space-y-2">
-                    <Label className="text-xs">Edition Name</Label>
-                    <Input
-                      placeholder="e.g., Genesis, Legendary"
-                      value={edition.name}
-                      onChange={(e) => updateEdition(edition.id, 'name', e.target.value)}
-                    />
-                  </div>
-
-                  {/* Max Supply */}
-                  <div className="space-y-2">
-                    <Label className="text-xs">Max Supply</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      placeholder="100"
-                      value={edition.maxSupply}
-                      onChange={(e) => updateEdition(edition.id, 'maxSupply', parseInt(e.target.value) || 0)}
-                    />
-                  </div>
-
-                  {/* Mint Price */}
-                  <div className="space-y-2">
-                    <Label className="text-xs">Mint Price</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        type="number"
-                        min={0}
-                        step={0.001}
-                        placeholder="0.1"
-                        value={edition.mintPrice}
-                        onChange={(e) => updateEdition(edition.id, 'mintPrice', parseFloat(e.target.value) || 0)}
-                        className="flex-1"
-                      />
-                      <Select
-                        value={edition.currency}
-                        onValueChange={(v) => updateEdition(edition.id, 'currency', v)}
-                      >
-                        <SelectTrigger className="w-24">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ETH">ETH</SelectItem>
-                          <SelectItem value="MATIC">MATIC</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {/* Reveal Status */}
-                  <div className="col-span-2 space-y-2">
-                    <Label className="text-xs">Reveal Status</Label>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant={edition.revealStatus === 'hidden' ? 'default' : 'outline'}
-                        size="sm"
-                        className="flex-1 gap-2"
-                        onClick={() => updateEdition(edition.id, 'revealStatus', 'hidden')}
-                      >
-                        <EyeOff className="w-4 h-4" />
-                        Hidden
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={edition.revealStatus === 'revealed' ? 'default' : 'outline'}
-                        size="sm"
-                        className="flex-1 gap-2"
-                        onClick={() => updateEdition(edition.id, 'revealStatus', 'revealed')}
-                      >
-                        <Eye className="w-4 h-4" />
-                        Revealed
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={editions.map((ed) => ed.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <AnimatePresence mode="popLayout">
+                {editions.map((edition, index) => (
+                  <SortableEditionCard
+                    key={edition.id}
+                    edition={edition}
+                    index={index}
+                    onUpdate={(field, value) => updateEdition(edition.id, field, value)}
+                    onRemove={() => removeEdition(edition.id)}
+                  />
+                ))}
+              </AnimatePresence>
+            </SortableContext>
+          </DndContext>
 
           <Button
             variant="outline"
