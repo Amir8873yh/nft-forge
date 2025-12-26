@@ -36,6 +36,9 @@ import {
   EyeOff,
   Coins,
   GripVertical,
+  Wand2,
+  Copy,
+  ChevronDown,
 } from 'lucide-react';
 import {
   Sheet,
@@ -552,6 +555,65 @@ function SortableEditionCard({
   );
 }
 
+// Edition templates for bulk creation
+interface EditionTemplate {
+  id: string;
+  name: string;
+  description: string;
+  editions: Omit<Edition, 'id' | 'minted'>[];
+}
+
+const editionTemplates: EditionTemplate[] = [
+  {
+    id: 'standard-tiered',
+    name: 'Standard Tiered',
+    description: 'Common, Rare, Epic, Legendary editions',
+    editions: [
+      { name: 'Common', maxSupply: 1000, mintPrice: 0.01, currency: 'ETH', revealStatus: 'hidden' },
+      { name: 'Rare', maxSupply: 500, mintPrice: 0.05, currency: 'ETH', revealStatus: 'hidden' },
+      { name: 'Epic', maxSupply: 100, mintPrice: 0.15, currency: 'ETH', revealStatus: 'hidden' },
+      { name: 'Legendary', maxSupply: 10, mintPrice: 0.5, currency: 'ETH', revealStatus: 'hidden' },
+    ],
+  },
+  {
+    id: 'genesis-collection',
+    name: 'Genesis Collection',
+    description: 'Genesis and Founder editions',
+    editions: [
+      { name: 'Genesis', maxSupply: 500, mintPrice: 0.1, currency: 'ETH', revealStatus: 'hidden' },
+      { name: 'Founder', maxSupply: 50, mintPrice: 0.5, currency: 'ETH', revealStatus: 'hidden' },
+    ],
+  },
+  {
+    id: 'limited-drops',
+    name: 'Limited Drops',
+    description: 'Standard, Gold, Diamond editions',
+    editions: [
+      { name: 'Standard', maxSupply: 250, mintPrice: 0.05, currency: 'ETH', revealStatus: 'hidden' },
+      { name: 'Gold', maxSupply: 50, mintPrice: 0.2, currency: 'ETH', revealStatus: 'hidden' },
+      { name: 'Diamond', maxSupply: 10, mintPrice: 1.0, currency: 'ETH', revealStatus: 'hidden' },
+    ],
+  },
+  {
+    id: 'open-edition',
+    name: 'Open Edition',
+    description: 'Single open edition with no supply limit',
+    editions: [
+      { name: 'Open Edition', maxSupply: 10000, mintPrice: 0.01, currency: 'ETH', revealStatus: 'revealed' },
+    ],
+  },
+  {
+    id: 'polygon-collection',
+    name: 'Polygon Collection',
+    description: 'Budget-friendly MATIC editions',
+    editions: [
+      { name: 'Basic', maxSupply: 2000, mintPrice: 5, currency: 'MATIC', revealStatus: 'hidden' },
+      { name: 'Premium', maxSupply: 200, mintPrice: 25, currency: 'MATIC', revealStatus: 'hidden' },
+      { name: 'Exclusive', maxSupply: 20, mintPrice: 100, currency: 'MATIC', revealStatus: 'hidden' },
+    ],
+  },
+];
+
 function EditionManager({
   editions,
   onEditionsChange,
@@ -559,6 +621,8 @@ function EditionManager({
   editions: Edition[];
   onEditionsChange: (editions: Edition[]) => void;
 }) {
+  const [showTemplates, setShowTemplates] = useState(false);
+  
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -568,6 +632,17 @@ function EditionManager({
 
   const addEdition = () => {
     onEditionsChange([...editions, createDefaultEdition()]);
+  };
+
+  const applyTemplate = (template: EditionTemplate) => {
+    const newEditions = template.editions.map((ed) => ({
+      ...ed,
+      id: `ed-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      minted: 0,
+    }));
+    onEditionsChange([...editions, ...newEditions]);
+    setShowTemplates(false);
+    toast.success(`Added ${newEditions.length} editions from "${template.name}" template`);
   };
 
   const updateEdition = (id: string, field: keyof Edition, value: any) => {
@@ -592,14 +667,85 @@ function EditionManager({
 
   return (
     <div className="space-y-4">
+      {/* Template Selector */}
+      <div className="relative">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setShowTemplates(!showTemplates)}
+          className="w-full justify-between gap-2"
+        >
+          <span className="flex items-center gap-2">
+            <Wand2 className="w-4 h-4 text-primary" />
+            Use Template
+          </span>
+          <ChevronDown className={`w-4 h-4 transition-transform ${showTemplates ? 'rotate-180' : ''}`} />
+        </Button>
+        
+        <AnimatePresence>
+          {showTemplates && (
+            <motion.div
+              initial={{ opacity: 0, y: -10, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: 'auto' }}
+              exit={{ opacity: 0, y: -10, height: 0 }}
+              className="mt-2 overflow-hidden"
+            >
+              <div className="grid gap-2">
+                {editionTemplates.map((template) => (
+                  <motion.div
+                    key={template.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="p-3 rounded-lg border border-border/50 bg-card/50 hover:bg-card hover:border-primary/30 cursor-pointer transition-all group"
+                    onClick={() => applyTemplate(template)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium group-hover:text-primary transition-colors">
+                          {template.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {template.description}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px]">
+                          {template.editions.length} editions
+                        </Badge>
+                        <Copy className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {template.editions.map((ed, i) => (
+                        <Badge 
+                          key={i} 
+                          variant="secondary" 
+                          className="text-[10px] py-0.5"
+                        >
+                          {ed.name}: {ed.mintPrice} {ed.currency}
+                        </Badge>
+                      ))}
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
       {editions.length === 0 ? (
         <div className="text-center py-8 border border-dashed border-border/50 rounded-lg">
           <Crown className="w-8 h-8 mx-auto mb-2 text-muted-foreground opacity-50" />
           <p className="text-sm text-muted-foreground mb-3">No editions added yet</p>
-          <Button variant="outline" size="sm" onClick={addEdition}>
-            <Plus className="w-4 h-4 mr-1" />
-            Add First Edition
-          </Button>
+          <div className="flex items-center justify-center gap-2">
+            <Button variant="outline" size="sm" onClick={addEdition}>
+              <Plus className="w-4 h-4 mr-1" />
+              Add Custom
+            </Button>
+            <span className="text-xs text-muted-foreground">or use a template above</span>
+          </div>
         </div>
       ) : (
         <div className="space-y-3">
