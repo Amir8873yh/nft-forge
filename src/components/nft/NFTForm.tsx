@@ -39,6 +39,9 @@ import {
   Wand2,
   Copy,
   ChevronDown,
+  Bookmark,
+  Star,
+  X as XIcon,
 } from 'lucide-react';
 import {
   Sheet,
@@ -561,7 +564,23 @@ interface EditionTemplate {
   name: string;
   description: string;
   editions: Omit<Edition, 'id' | 'minted'>[];
+  isCustom?: boolean;
 }
+
+const CUSTOM_TEMPLATES_KEY = 'nft-custom-edition-templates';
+
+const loadCustomTemplates = (): EditionTemplate[] => {
+  try {
+    const stored = localStorage.getItem(CUSTOM_TEMPLATES_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveCustomTemplates = (templates: EditionTemplate[]) => {
+  localStorage.setItem(CUSTOM_TEMPLATES_KEY, JSON.stringify(templates));
+};
 
 const editionTemplates: EditionTemplate[] = [
   {
@@ -622,6 +641,10 @@ function EditionManager({
   onEditionsChange: (editions: Edition[]) => void;
 }) {
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [templateDescription, setTemplateDescription] = useState('');
+  const [customTemplates, setCustomTemplates] = useState<EditionTemplate[]>(loadCustomTemplates);
   
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -629,6 +652,8 @@ function EditionManager({
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
+  const allTemplates = [...editionTemplates, ...customTemplates];
 
   const addEdition = () => {
     onEditionsChange([...editions, createDefaultEdition()]);
@@ -643,6 +668,42 @@ function EditionManager({
     onEditionsChange([...editions, ...newEditions]);
     setShowTemplates(false);
     toast.success(`Added ${newEditions.length} editions from "${template.name}" template`);
+  };
+
+  const saveAsTemplate = () => {
+    if (!templateName.trim()) {
+      toast.error('Please enter a template name');
+      return;
+    }
+    if (editions.length === 0) {
+      toast.error('No editions to save as template');
+      return;
+    }
+
+    const newTemplate: EditionTemplate = {
+      id: `custom-${Date.now()}`,
+      name: templateName.trim(),
+      description: templateDescription.trim() || `Custom template with ${editions.length} editions`,
+      editions: editions.map(({ id, minted, ...rest }) => rest),
+      isCustom: true,
+    };
+
+    const updatedTemplates = [...customTemplates, newTemplate];
+    setCustomTemplates(updatedTemplates);
+    saveCustomTemplates(updatedTemplates);
+    
+    setShowSaveDialog(false);
+    setTemplateName('');
+    setTemplateDescription('');
+    toast.success(`Template "${newTemplate.name}" saved successfully`);
+  };
+
+  const deleteCustomTemplate = (templateId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updatedTemplates = customTemplates.filter(t => t.id !== templateId);
+    setCustomTemplates(updatedTemplates);
+    saveCustomTemplates(updatedTemplates);
+    toast.success('Template deleted');
   };
 
   const updateEdition = (id: string, field: keyof Edition, value: any) => {
@@ -667,14 +728,14 @@ function EditionManager({
 
   return (
     <div className="space-y-4">
-      {/* Template Selector */}
-      <div className="relative">
+      {/* Template Actions */}
+      <div className="flex gap-2">
         <Button
           type="button"
           variant="outline"
           size="sm"
           onClick={() => setShowTemplates(!showTemplates)}
-          className="w-full justify-between gap-2"
+          className="flex-1 justify-between gap-2"
         >
           <span className="flex items-center gap-2">
             <Wand2 className="w-4 h-4 text-primary" />
@@ -683,57 +744,202 @@ function EditionManager({
           <ChevronDown className={`w-4 h-4 transition-transform ${showTemplates ? 'rotate-180' : ''}`} />
         </Button>
         
-        <AnimatePresence>
-          {showTemplates && (
-            <motion.div
-              initial={{ opacity: 0, y: -10, height: 0 }}
-              animate={{ opacity: 1, y: 0, height: 'auto' }}
-              exit={{ opacity: 0, y: -10, height: 0 }}
-              className="mt-2 overflow-hidden"
-            >
-              <div className="grid gap-2">
-                {editionTemplates.map((template) => (
-                  <motion.div
-                    key={template.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="p-3 rounded-lg border border-border/50 bg-card/50 hover:bg-card hover:border-primary/30 cursor-pointer transition-all group"
-                    onClick={() => applyTemplate(template)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium group-hover:text-primary transition-colors">
-                          {template.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {template.description}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px]">
-                          {template.editions.length} editions
-                        </Badge>
-                        <Copy className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {template.editions.map((ed, i) => (
-                        <Badge 
-                          key={i} 
-                          variant="secondary" 
-                          className="text-[10px] py-0.5"
-                        >
-                          {ed.name}: {ed.mintPrice} {ed.currency}
-                        </Badge>
-                      ))}
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {editions.length > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowSaveDialog(true)}
+            className="gap-2"
+          >
+            <Bookmark className="w-4 h-4 text-warning" />
+            Save
+          </Button>
+        )}
       </div>
+
+      {/* Save Template Dialog */}
+      <AnimatePresence>
+        {showSaveDialog && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="p-4 rounded-lg border border-warning/30 bg-warning/5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Bookmark className="w-4 h-4 text-warning" />
+                  <span className="text-sm font-medium">Save as Template</span>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => setShowSaveDialog(false)}
+                >
+                  <XIcon className="w-4 h-4" />
+                </Button>
+              </div>
+              
+              <div className="space-y-2">
+                <Input
+                  placeholder="Template name (e.g., My Collection)"
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                  className="bg-background"
+                />
+                <Input
+                  placeholder="Description (optional)"
+                  value={templateDescription}
+                  onChange={(e) => setTemplateDescription(e.target.value)}
+                  className="bg-background"
+                />
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                  Saving {editions.length} edition{editions.length !== 1 ? 's' : ''}
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={saveAsTemplate}
+                  className="gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  Save Template
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+        
+      {/* Template List */}
+      <AnimatePresence>
+        {showTemplates && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, y: -10, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="space-y-3">
+              {/* Custom Templates Section */}
+              {customTemplates.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Star className="w-3 h-3 text-warning" />
+                    <span>Your Templates</span>
+                  </div>
+                  <div className="grid gap-2">
+                    {customTemplates.map((template) => (
+                      <motion.div
+                        key={template.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="p-3 rounded-lg border border-warning/30 bg-warning/5 hover:bg-warning/10 hover:border-warning/50 cursor-pointer transition-all group"
+                        onClick={() => applyTemplate(template)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <Star className="w-3 h-3 text-warning flex-shrink-0" />
+                              <p className="text-sm font-medium group-hover:text-warning transition-colors truncate">
+                                {template.name}
+                              </p>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                              {template.description}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                            <Badge variant="outline" className="text-[10px]">
+                              {template.editions.length} editions
+                            </Badge>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                              onClick={(e) => deleteCustomTemplate(template.id, e)}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {template.editions.slice(0, 4).map((ed, i) => (
+                            <Badge 
+                              key={i} 
+                              variant="secondary" 
+                              className="text-[10px] py-0.5"
+                            >
+                              {ed.name}: {ed.mintPrice} {ed.currency}
+                            </Badge>
+                          ))}
+                          {template.editions.length > 4 && (
+                            <Badge variant="secondary" className="text-[10px] py-0.5">
+                              +{template.editions.length - 4} more
+                            </Badge>
+                          )}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Preset Templates Section */}
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Preset Templates</p>
+                <div className="grid gap-2">
+                  {editionTemplates.map((template) => (
+                    <motion.div
+                      key={template.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="p-3 rounded-lg border border-border/50 bg-card/50 hover:bg-card hover:border-primary/30 cursor-pointer transition-all group"
+                      onClick={() => applyTemplate(template)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium group-hover:text-primary transition-colors">
+                            {template.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {template.description}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-[10px]">
+                            {template.editions.length} editions
+                          </Badge>
+                          <Copy className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {template.editions.map((ed, i) => (
+                          <Badge 
+                            key={i} 
+                            variant="secondary" 
+                            className="text-[10px] py-0.5"
+                          >
+                            {ed.name}: {ed.mintPrice} {ed.currency}
+                          </Badge>
+                        ))}
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {editions.length === 0 ? (
         <div className="text-center py-8 border border-dashed border-border/50 rounded-lg">
